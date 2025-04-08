@@ -1,27 +1,47 @@
-# config.py
+#config.py
 
-# Styles pour l'interface graphique
+"""
+Configuration pour l'application de gestion de bibliothèque.
+
+Ce module contient les styles pour l'interface graphique et les paramètres de connexion
+à la base de données MySQL. Les configurations sensibles (comme les identifiants MySQL)
+devraient être externalisées dans des variables d'environnement en production.
+"""
+
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
 STYLES = {
     "bg": "#ECF0F1",
-    "fg": "#2C3E50",
-    "button_bg": "#3498DB",
+    "fg": "#1A2526",
+    "button_bg": "#4A90E2",
     "button_fg": "#FFFFFF",
-    "entry_bg": "#FFFFFF",
+    "entry_bg": "#F7F7F7",
     "font_title": ("Helvetica", 20, "bold"),
-    "font_label": ("Helvetica", 12),
-    "font_button": ("Helvetica", 12, "bold"),
+    "font_label": ("Helvetica", 11),
+    "font_button": ("Helvetica", 11, "bold"),
     "card_bg": "#FFFFFF",
     "card_border": "#E0E0E0",
-    "highlight": "#3498DB",
+    "highlight": "#4A90E2",
     "order_bg": "#2ECC71",
-    "menu_bg": "#34495E",
-    "menu_border": "#2C3E50"
+    "menu_bg": "#E8ECEF",
+    "menu_border": "#D3D8DE"
 }
 
-# Paramètres de connexion MySQL
 MYSQL_CONFIG = {
-    "host": "localhost",
-    "user": "root",  # Remplace par ton utilisateur MySQL
-    "password": "",  # Remplace par ton mot de passe MySQL
-    "database": "gestion_dejalu"
+    "host": os.getenv("MYSQL_HOST", "localhost"),
+    "user": os.getenv("MYSQL_USER", "root"),
+    "password": os.getenv("MYSQL_PASSWORD", ""),
+    "database": os.getenv("MYSQL_DATABASE", "gestion_dejalu"),
+    "raise_on_warnings": True
 }
+
+# Vérification améliorée des identifiants
+if not MYSQL_CONFIG["user"] or not MYSQL_CONFIG["password"]:
+    import warnings
+    warnings.warn(
+        "Identifiants MySQL manquants ou incomplets. Vérifiez MYSQL_USER et MYSQL_PASSWORD dans .env.",
+        UserWarning
+    )

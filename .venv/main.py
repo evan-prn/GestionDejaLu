@@ -1,36 +1,28 @@
-"""
-Module principal de l'application graphique.
-
-Ce module crée et lance l'application graphique en initialisant
-une instance de la classe `Application` et en démarrant la boucle
-principale de l'interface graphique.
-
-Exemple d'utilisation:
-    python mon_script.py
-"""
+#!/usr/bin/env python3
+"""Script principal pour lancer une application graphique."""
 
 from gui import Application
+import logging
 
+# Configuration basique du logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 def main():
     """
-    Point d'entrée de l'application.
+    Initialise et exécute l'application graphique.
 
-    Crée une instance de la classe `Application` et lance la
-    boucle principale de l'interface graphique pour gérer
-    les événements utilisateur.
-
-    Cette fonction est exécutée uniquement si le module est
-    exécuté directement (pas importé).
-
+    Crée une instance de la classe Application et démarre sa boucle principale
+    pour gérer les interactions utilisateur.
     """
-    # Création d'une instance de l'application
-    app = Application()
+    try:
+        # Instanciation de l'application
+        app = Application()
+        # Lancement de la boucle d'événements
+        app.mainloop()
+    except Exception as e:
+        logger.error(f"Erreur lors du lancement de l'application : {e}")
+        raise
 
-    # Démarrage de la boucle principale de l'application
-    app.mainloop()
-
-
-# Exécution de la fonction main si ce module est exécuté directement
 if __name__ == "__main__":
     main()
