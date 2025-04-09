@@ -17,6 +17,7 @@ class Database:  # Ajout temporaire pour éviter des erreurs si non défini aill
         return mysql.connector.connect(**MYSQL_CONFIG)
 
 class Application(tk.Tk):
+
     def __init__(self):
         super().__init__()
         self.title("Bibliothèque Moderne - Google Books")

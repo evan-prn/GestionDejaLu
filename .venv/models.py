@@ -91,3 +91,5 @@ if __name__ == "__main__":
         conn.close()
     except mysql.connector.Error as e:
         logger.error(f"Échec de la connexion : {e}")
+
+
