@@ -1,26 +1,22 @@
+"""Module pour l'interface graphique de l'application GestionDejaLu."""
+
 import tkinter as tk
 from tkinter import messagebox, ttk
 from config import STYLES
 from api import rechercher_livres_par_titre_ou_isbn
-from models import ajouter_client, get_clients, enregistrer_commande, rechercher_clients
+from client import ajouter_client, rechercher_clients, get_clients
+from models import enregistrer_commande
 import logging
 
-# Configuration du logging
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-class Database:  # Ajout temporaire pour éviter des erreurs si non défini ailleurs
-    @staticmethod
-    def get_connection():
-        import mysql.connector
-        from config import MYSQL_CONFIG
-        return mysql.connector.connect(**MYSQL_CONFIG)
-
 class Application(tk.Tk):
+    """Classe principale pour l'interface graphique de l'application."""
 
     def __init__(self):
+        """Initialise l'application Tkinter."""
         super().__init__()
-        self.title("Bibliothèque Moderne - Google Books")
+        self.title("Gestion DejaLu")
         self.attributes('-fullscreen', True)
         self.configure(bg=STYLES["bg"])
         self.panier = []
@@ -29,6 +25,32 @@ class Application(tk.Tk):
         self.creer_widgets()
 
     def creer_widgets(self):
+        """Crée les widgets principaux de l'interface."""
+        # Barre de navigation
+        self.creer_barre_navigation()
+
+        # Contenu principal
+        main_frame = tk.Frame(self, bg=STYLES["bg"], padx=10, pady=10)
+        main_frame.pack(padx=10, pady=10, fill="both", expand=True)
+
+        tk.Label(main_frame, text="Recherche de Livres - Google Books",
+                 font=STYLES["font_title"], bg=STYLES["bg"], fg=STYLES["fg"]).pack(pady=(0, 20))
+
+        # Cadre de recherche
+        self.creer_cadre_recherche(main_frame)
+
+        # Zone de résultats avec défilement
+        self.canvas = tk.Canvas(main_frame, bg=STYLES["bg"])
+        scrollbar = ttk.Scrollbar(main_frame, orient="vertical", command=self.canvas.yview)
+        self.scrollable_frame = tk.Frame(self.canvas, bg=STYLES["bg"])
+        self.scrollable_frame.bind("<Configure>", lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all")))
+        self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
+        self.canvas.configure(yscrollcommand=scrollbar.set)
+        self.canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+
+    def creer_barre_navigation(self):
+        """Crée la barre de navigation avec les boutons principaux."""
         nav_frame = tk.Frame(self, bg=STYLES["menu_bg"], pady=10, padx=10, bd=1, relief="raised")
         nav_frame.pack(fill="x", side="top")
 
@@ -42,13 +64,13 @@ class Application(tk.Tk):
                   bg="#E74C3C", fg=STYLES["button_fg"], relief="flat", padx=15, pady=5,
                   command=self.quitter).pack(side="right", padx=10)
 
-        main_frame = tk.Frame(self, bg=STYLES["bg"], padx=10, pady=10)
-        main_frame.pack(padx=10, pady=10, fill="both", expand=True)
+    def creer_cadre_recherche(self, parent):
+        """Crée le cadre de recherche pour les livres.
 
-        tk.Label(main_frame, text="Recherche de Livres - Google Books",
-                 font=STYLES["font_title"], bg=STYLES["bg"], fg=STYLES["fg"]).pack(pady=(0, 20))
-
-        search_frame = tk.Frame(main_frame, bg=STYLES["menu_bg"], padx=10, pady=8, bd=1, relief="solid",
+        Args:
+            parent (tk.Frame): Frame parent pour le cadre de recherche.
+        """
+        search_frame = tk.Frame(parent, bg=STYLES["menu_bg"], padx=10, pady=8, bd=1, relief="solid",
                                 highlightbackground=STYLES["menu_border"], highlightthickness=1)
         search_frame.pack(fill="x", pady=5)
 
@@ -77,22 +99,14 @@ class Application(tk.Tk):
                   bg=STYLES["button_bg"], fg=STYLES["button_fg"], relief="flat",
                   padx=10, pady=3, command=self.effacer_recherche).pack(side="left", padx=5)
 
-        canvas = tk.Canvas(main_frame, bg=STYLES["bg"])
-        scrollbar = ttk.Scrollbar(main_frame, orient="vertical", command=canvas.yview)
-        self.scrollable_frame = tk.Frame(canvas, bg=STYLES["bg"])
-        self.scrollable_frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
-        canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
-        canvas.configure(yscrollcommand=scrollbar.set)
-        canvas.pack(side="left", fill="both", expand=True)
-        scrollbar.pack(side="right", fill="y")
-
     def quitter(self):
+        """Ferme l'application après confirmation."""
         if messagebox.askokcancel("Quitter", "Voulez-vous vraiment quitter l'application ?"):
             self.destroy()
             logger.info("Application fermée par l'utilisateur.")
 
     def gestion_clients(self):
-        """Ouvre une fenêtre moderne pour gérer les clients."""
+        """Ouvre une fenêtre pour la gestion des clients."""
         client_window = tk.Toplevel(self)
         client_window.title("Gestion des Clients")
         client_window.geometry("800x600")
@@ -103,7 +117,24 @@ class Application(tk.Tk):
                  bg=STYLES["bg"], fg=STYLES["fg"]).pack(pady=10)
 
         # Cadre de recherche
-        search_frame = tk.Frame(client_window, bg=STYLES["menu_bg"], padx=10, pady=10, bd=1, relief="solid")
+        self.creer_cadre_recherche_clients(client_window)
+
+        # Cadre pour ajouter un client
+        self.creer_cadre_ajout_client(client_window)
+
+        # Cadre des résultats
+        self.creer_cadre_resultats_clients(client_window)
+
+        # Charger les clients initiaux
+        self.rechercher_clients_gui("", "", "", client_window)
+
+    def creer_cadre_recherche_clients(self, parent):
+        """Crée le cadre de recherche pour les clients.
+
+        Args:
+            parent (tk.Toplevel): Fenêtre parent.
+        """
+        search_frame = tk.Frame(parent, bg=STYLES["menu_bg"], padx=10, pady=10, bd=1, relief="solid")
         search_frame.pack(fill="x", padx=10, pady=5)
 
         tk.Label(search_frame, text="Nom:", bg=STYLES["menu_bg"], fg=STYLES["fg"],
@@ -123,10 +154,17 @@ class Application(tk.Tk):
 
         tk.Button(search_frame, text="Rechercher", font=STYLES["font_button"],
                   bg=STYLES["button_bg"], fg=STYLES["button_fg"], relief="flat",
-                  command=lambda: self.rechercher_clients_gui(nom_search.get(), prenom_search.get(), telephone_search.get(), client_window)).grid(row=0, column=6, padx=10, pady=5)
+                  command=lambda: self.rechercher_clients_gui(nom_search.get(), prenom_search.get(),
+                                                             telephone_search.get(), parent)).grid(
+                      row=0, column=6, padx=10, pady=5)
 
-        # Cadre pour ajouter un client (utilisation de grid uniquement)
-        add_frame = tk.Frame(client_window, bg=STYLES["bg"], padx=10, pady=10, bd=1, relief="solid")
+    def creer_cadre_ajout_client(self, parent):
+        """Crée le cadre pour ajouter un client.
+
+        Args:
+            parent (tk.Toplevel): Fenêtre parent.
+        """
+        add_frame = tk.Frame(parent, bg=STYLES["bg"], padx=10, pady=10, bd=1, relief="solid")
         add_frame.pack(fill="x", padx=10, pady=5)
 
         tk.Label(add_frame, text="Ajouter un Client", font=("Helvetica", 14, "bold"),
@@ -155,14 +193,20 @@ class Application(tk.Tk):
         tk.Button(add_frame, text="Ajouter", font=STYLES["font_button"],
                   bg=STYLES["button_bg"], fg=STYLES["button_fg"], relief="flat",
                   command=lambda: self.ajouter_client(nom_entry.get(), prenom_entry.get(), age_entry.get(),
-                                                      email_entry.get(), telephone_entry.get(), client_window)).grid(row=3, column=3, padx=10, pady=10)
+                                                     email_entry.get(), telephone_entry.get(), parent)).grid(
+                      row=3, column=3, padx=10, pady=10)
 
-        # Cadre des résultats
-        result_frame = tk.Frame(client_window, bg=STYLES["bg"])
+    def creer_cadre_resultats_clients(self, parent):
+        """Crée le cadre pour afficher les résultats des clients.
+
+        Args:
+            parent (tk.Toplevel): Fenêtre parent.
+        """
+        result_frame = tk.Frame(parent, bg=STYLES["bg"])
         result_frame.pack(fill="both", expand=True, padx=10, pady=10)
 
-        # Initialisation du Treeview
-        self.client_tree = ttk.Treeview(result_frame, columns=("ID", "Nom", "Prénom", "Âge", "Email", "Téléphone"), show="headings", height=10)
+        self.client_tree = ttk.Treeview(result_frame, columns=("ID", "Nom", "Prénom", "Âge", "Email", "Téléphone"),
+                                        show="headings", height=10)
         self.client_tree.heading("ID", text="ID")
         self.client_tree.heading("Nom", text="Nom")
         self.client_tree.heading("Prénom", text="Prénom")
@@ -181,45 +225,76 @@ class Application(tk.Tk):
         scrollbar.pack(side="right", fill="y")
         self.client_tree.configure(yscrollcommand=scrollbar.set)
 
-        # Boutons d'action
-        action_frame = tk.Frame(client_window, bg=STYLES["bg"])
+        action_frame = tk.Frame(parent, bg=STYLES["bg"])
         action_frame.pack(pady=10)
 
         tk.Button(action_frame, text="Modifier", font=STYLES["font_button"],
                   bg="#F1C40F", fg=STYLES["button_fg"], relief="flat",
-                  command=lambda: self.modifier_client(client_window)).pack(side="left", padx=5)
+                  command=lambda: self.modifier_client(parent)).pack(side="left", padx=5)
         tk.Button(action_frame, text="Supprimer", font=STYLES["font_button"],
                   bg="#E74C3C", fg=STYLES["button_fg"], relief="flat",
-                  command=lambda: self.supprimer_client(client_window)).pack(side="left", padx=5)
-
-        # Charger les clients initiaux après création du Treeview
-        self.rechercher_clients_gui("", "", "", client_window)
+                  command=lambda: self.supprimer_client(parent)).pack(side="left", padx=5)
 
     def rechercher_clients_gui(self, nom, prenom, telephone, window):
-        """Recherche et affiche les clients dans le Treeview."""
+        """Recherche et affiche les clients dans le Treeview.
+
+        Args:
+            nom (str): Nom ou partie du nom.
+            prenom (str): Prénom ou partie du prénom.
+            telephone (str): Numéro de téléphone ou partie.
+            window (tk.Toplevel): Fenêtre de gestion des clients.
+        """
         if not hasattr(self, 'client_tree'):
             logger.error("Treeview non initialisé avant la recherche.")
+            messagebox.showerror("Erreur", "Erreur interne : Treeview non initialisé.")
             return
         for item in self.client_tree.get_children():
             self.client_tree.delete(item)
 
         clients = rechercher_clients(nom=nom, prenom=prenom, telephone=telephone)
         for client in clients:
-            self.client_tree.insert("", "end", values=(client[0], client[1], client[2], client[3], client[4], client[5]))
+            self.client_tree.insert("", "end", values=(client[0], client[1], client[2], client[3], client[4], client[5] or ""))
 
     def ajouter_client(self, nom, prenom, age, email, telephone, window):
+        """Ajoute un client via l'interface.
+
+        Args:
+            nom (str): Nom du client.
+            prenom (str): Prénom du client.
+            age (str): Âge du client.
+            email (str): Email du client.
+            telephone (str): Numéro de téléphone.
+            window (tk.Toplevel): Fenêtre de gestion des clients.
+        """
+        from client import validate_email, validate_phone
         if not all([nom, prenom, age, email]):
             messagebox.showwarning("Erreur", "Tous les champs obligatoires (nom, prénom, âge, email) doivent être remplis.")
             return
+        if not validate_email(email):
+            messagebox.showerror("Erreur", "Format d'email invalide.")
+            return
+        if not validate_phone(telephone):
+            messagebox.showerror("Erreur", "Format de téléphone invalide (ex. +33123456789 ou vide).")
+            return
         try:
             age = int(age)
+            if age <= 0:
+                messagebox.showerror("Erreur", "L'âge doit être un nombre positif.")
+                return
             if ajouter_client(nom, prenom, age, email, telephone):
                 messagebox.showinfo("Succès", f"Client {prenom} {nom} ajouté avec succès !")
-                self.rechercher_clients_gui("", "", "", window)  # Rafraîchir la liste
+                self.rechercher_clients_gui("", "", "", window)
+            else:
+                messagebox.showerror("Erreur", "Échec de l'ajout du client. Vérifiez les données.")
         except ValueError:
             messagebox.showerror("Erreur", "L'âge doit être un nombre.")
 
     def modifier_client(self, window):
+        """Ouvre une fenêtre pour modifier un client sélectionné.
+
+        Args:
+            window (tk.Toplevel): Fenêtre de gestion des clients.
+        """
         selected = self.client_tree.selection()
         if not selected:
             messagebox.showwarning("Erreur", "Veuillez sélectionner un client à modifier.")
@@ -254,7 +329,6 @@ class Application(tk.Tk):
         telephone_entry = tk.Entry(edit_window)
         telephone_entry.grid(row=5, column=1, padx=5, pady=5)
 
-        # Pré-remplir avec les données actuelles
         current_values = self.client_tree.item(selected[0])["values"]
         nom_entry.insert(0, current_values[1])
         prenom_entry.insert(0, current_values[2])
@@ -269,11 +343,34 @@ class Application(tk.Tk):
                                                                 edit_window, window)).grid(row=6, column=1, pady=10)
 
     def sauvegarder_modification(self, client_id, nom, prenom, age, email, telephone, edit_window, client_window):
+        """Sauvegarde les modifications d'un client.
+
+        Args:
+            client_id (int): ID du client.
+            nom (str): Nouveau nom.
+            prenom (str): Nouveau prénom.
+            age (str): Nouvel âge.
+            email (str): Nouvel email.
+            telephone (str): Nouveau téléphone.
+            edit_window (tk.Toplevel): Fenêtre de modification.
+            client_window (tk.Toplevel): Fenêtre de gestion des clients.
+        """
+        from client import validate_email, validate_phone
         if not all([nom, prenom, age, email]):
             messagebox.showwarning("Erreur", "Tous les champs obligatoires doivent être remplis.")
             return
+        if not validate_email(email):
+            messagebox.showerror("Erreur", "Format d'email invalide.")
+            return
+        if not validate_phone(telephone):
+            messagebox.showerror("Erreur", "Format de téléphone invalide (ex. +33123456789 ou vide).")
+            return
         try:
             age = int(age)
+            if age <= 0:
+                messagebox.showerror("Erreur", "L'âge doit être un nombre positif.")
+                return
+            from database import Database
             with Database.get_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute(
@@ -287,9 +384,15 @@ class Application(tk.Tk):
         except ValueError:
             messagebox.showerror("Erreur", "L'âge doit être un nombre.")
         except mysql.connector.Error as e:
-            messagebox.showerror("Erreur", f"Erreur MySQL : {e}")
+            logger.error(f"Erreur MySQL lors de la modification du client : {e}")
+            messagebox.showerror("Erreur", f"Erreur de base de données : {e}")
 
     def supprimer_client(self, window):
+        """Supprime un client sélectionné.
+
+        Args:
+            window (tk.Toplevel): Fenêtre de gestion des clients.
+        """
         selected = self.client_tree.selection()
         if not selected:
             messagebox.showwarning("Erreur", "Veuillez sélectionner un client à supprimer.")
@@ -298,6 +401,7 @@ class Application(tk.Tk):
         client_id = self.client_tree.item(selected[0])["values"][0]
         if messagebox.askyesno("Confirmation", "Voulez-vous vraiment supprimer ce client ?"):
             try:
+                from database import Database
                 with Database.get_connection() as conn:
                     cursor = conn.cursor()
                     cursor.execute("DELETE FROM clients WHERE id=%s", (client_id,))
@@ -305,22 +409,33 @@ class Application(tk.Tk):
                 messagebox.showinfo("Succès", "Client supprimé avec succès !")
                 self.rechercher_clients_gui("", "", "", window)
             except mysql.connector.Error as e:
-                messagebox.showerror("Erreur", f"Erreur MySQL : {e}")
+                logger.error(f"Erreur MySQL lors de la suppression du client : {e}")
+                messagebox.showerror("Erreur", f"Erreur de base de données : {e}")
 
     def rechercher_livres(self):
+        """Recherche des livres via l'API Google Books."""
         titre = self.titre_entry.get().strip()
         isbn = self.isbn_entry.get().strip()
         langue = self.langue_var.get() if self.langue_var.get() != "Tous" else None
         if not titre and not isbn:
             messagebox.showwarning("Erreur", "Veuillez entrer un titre ou un ISBN.")
             return
+        if isbn and not (isbn.isdigit() and len(isbn.replace("-", "")) in (10, 13)):
+            messagebox.showwarning("Erreur", "L'ISBN doit être un numéro de 10 ou 13 chiffres.")
+            return
         self.rechercher_btn.config(state="disabled", text="Recherche en cours...")
         self.update()
-        livres_trouves = rechercher_livres_par_titre_ou_isbn(titre=titre, isbn=isbn, langue=langue)
-        self.afficher_resultats(livres_trouves)
-        self.rechercher_btn.config(state="normal", text="Rechercher")
+        try:
+            livres_trouves = rechercher_livres_par_titre_ou_isbn(titre=titre, isbn=isbn, langue=langue)
+            self.afficher_resultats(livres_trouves)
+        except Exception as e:
+            logger.error(f"Erreur lors de la recherche de livres : {e}")
+            messagebox.showerror("Erreur", "Échec de la recherche. Vérifiez votre connexion.")
+        finally:
+            self.rechercher_btn.config(state="normal", text="Rechercher")
 
     def effacer_recherche(self):
+        """Efface les champs de recherche et les résultats."""
         self.titre_entry.delete(0, tk.END)
         self.isbn_entry.delete(0, tk.END)
         self.langue_var.set("Tous")
@@ -328,10 +443,20 @@ class Application(tk.Tk):
             widget.destroy()
 
     def ajouter_au_panier(self, livre):
+        """Ajoute un livre au panier.
+
+        Args:
+            livre (Livre): Livre à ajouter.
+        """
         self.panier.append(livre)
         messagebox.showinfo("Panier", f"{livre.titre} ajouté au panier !")
 
     def afficher_resultats(self, livres):
+        """Affiche les résultats de la recherche de livres.
+
+        Args:
+            livres (list): Liste d'objets Livre.
+        """
         for widget in self.scrollable_frame.winfo_children():
             widget.destroy()
         if not livres:
@@ -345,7 +470,7 @@ class Application(tk.Tk):
                      bg=STYLES["card_bg"], fg=STYLES["fg"], wraplength=600, justify="left").pack(anchor="w", pady=(0, 3))
             tk.Label(card_frame, text=f"Auteur(s) : {livre.auteur}", font=STYLES["font_label"],
                      bg=STYLES["card_bg"], fg=STYLES["fg"]).pack(anchor="w")
-            tk.Label(card_frame, text=f"ISBN : {livre.isbn}", font=STYLES["font_label"],
+            tk.Label(card_frame, text=f"ISBN : {livre.isbn or 'Non spécifié'}", font=STYLES["font_label"],
                      bg=STYLES["card_bg"], fg=STYLES["fg"]).pack(anchor="w")
             tk.Label(card_frame, text=f"Prix : {livre.prix_formate}", font=STYLES["font_label"],
                      bg=STYLES["card_bg"], fg=STYLES["fg"]).pack(anchor="w")
@@ -354,6 +479,7 @@ class Application(tk.Tk):
                       command=lambda l=livre: self.ajouter_au_panier(l)).pack(anchor="e", pady=5)
 
     def voir_panier(self):
+        """Ouvre une fenêtre pour afficher le contenu du panier."""
         if not self.panier:
             messagebox.showinfo("Panier", "Le panier est vide.")
             return
@@ -396,6 +522,12 @@ class Application(tk.Tk):
                   command=lambda: self.valider_commande(clients, panier_window)).pack(side="left", padx=5)
 
     def supprimer_du_panier(self, index, window):
+        """Supprime un livre du panier.
+
+        Args:
+            index (int): Index du livre dans le panier.
+            window (tk.Toplevel): Fenêtre du panier.
+        """
         if 0 <= index < len(self.panier):
             livre = self.panier.pop(index)
             messagebox.showinfo("Panier", f"{livre.titre} supprimé du panier.")
@@ -403,6 +535,12 @@ class Application(tk.Tk):
             self.voir_panier()
 
     def valider_commande(self, clients, window):
+        """Valide la commande pour un client sélectionné.
+
+        Args:
+            clients (list): Liste des clients disponibles.
+            window (tk.Toplevel): Fenêtre du panier.
+        """
         if not self.panier:
             messagebox.showwarning("Erreur", "Le panier est vide.")
             return
@@ -414,9 +552,13 @@ class Application(tk.Tk):
         if not client_id:
             messagebox.showwarning("Erreur", "Veuillez sélectionner un client valide.")
             return
-        if enregistrer_commande(client_id, self.panier):
-            messagebox.showinfo("Succès", f"Commande validée pour {client_selection} !")
-            self.panier.clear()
-            window.destroy()
-        else:
-            messagebox.showerror("Erreur", "Échec de l'enregistrement de la commande.")
+        try:
+            if enregistrer_commande(client_id, self.panier):
+                messagebox.showinfo("Succès", f"Commande validée pour {client_selection} !")
+                self.panier.clear()
+                window.destroy()
+            else:
+                messagebox.showerror("Erreur", "Échec de l'enregistrement de la commande.")
+        except Exception as e:
+            logger.error(f"Erreur lors de la validation de la commande : {e}")
+            messagebox.showerror("Erreur", f"Erreur lors de la validation : {e}")
